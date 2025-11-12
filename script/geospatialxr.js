@@ -10,9 +10,6 @@ function updateMapLocation(lat, lon, zoom=16){
 	mapParams = {"lat": lat, "lon": lon, "zoom": zoom};
 	var paramsJSON = JSON.stringify(mapParams);
 	gameInstance.SendMessage("CitySimulatorMap", "jsSetMap", paramsJSON);
-
-	// Iowa City Hospital
-	// {"lat": 41.65714506787528, "lon":-91.54739695223219, "zoom": 16}
 }
 
 
@@ -23,19 +20,20 @@ function extendMap(west, east, north, south){
 }
 
 
+// Indian flood sensor POIs - Mumbai example
 var streamSensorPOIs = {"pois": [
-							{"lat": 41.65714506787528, 
-								"lon": -91.54739695223219, 
+							{"lat": 19.0596, 
+								"lon": 72.8295, 
 								"type": "StreamSensor", 
-								"content": "Stream Sensor #1 \nDepth: 5 ft."},
-							{"lat": 41.6569866321176, 
-								"lon": -91.5409481636539, 
+								"content": "Mithi River Gauge \nDepth: 2.5 m"},
+							{"lat": 19.0610, 
+								"lon": 72.8310, 
 								"type": "RainGauge", 
-								"content": "Rain Gauge \nStage: 23 ft."},
-							{"lat": 41.6529866321176, 
-								"lon": -91.5449481636539, 
+								"content": "IMD Rain Gauge \nStage: 25 mm/hr"},
+							{"lat": 19.0605, 
+								"lon": 72.8300, 
 								"type": "Warning", 
-								"content": "Flood Warning \nStage: 3 ft."},
+								"content": "Flood Warning \nWater Level: 1.8 m"},
 	
 		]};
 
@@ -44,162 +42,9 @@ function addPOI(pois){
 	gameInstance.SendMessage("CitySimulatorMap", "jsSetPOIs", paramsJSON);	
 }
 
-function useCaseTrafficDouble(){
-	useCaseTraffic();
-	useCaseTraffic();
-}
-
-function useCaseTraffic(){
-
-	updateMapLocation(37.5317132, -77.4289454);
-
-	var accidentPOIs = {"pois": [
-								{"lat": 37.53275, 
-									"lon": 	-77.43183, 
-									"type": "Accident", 
-									"height": 70,
-									"content": "Accident\nInjuries: 1\nFatalities: 0"},
-								{"lat": 37.5356, 
-									"lon": 	-77.42537, 
-									"type": "Accident", 
-									"height": 70,
-									"content": "Accident\nInjuries: 2\nFatalities: 0"},
-								{"lat": 37.53685, 
-									"lon": 	-77.42532, 
-									"type": "Accident", 
-									"height": 70,
-									"content": "Property Damage\nInjuries: 0\nFatalities: 0"},
-			]};
-
-	var warningPOIs = {"pois": [
-								{"lat": 37.532351, 
-									"lon": -77.423850, 
-									"type": "Warning", 
-									"height": 60,
-									"content": "Construction \nRoad Widening"},
-		
-			]};
-
-	var radioactivePOIs = {"pois": [
-								{"lat": 37.5317132, 
-									"lon": -77.4289454, 
-									"type": "Radioactive", 
-									"height": 70,
-									"content": "Dosimeter Alert \nRadiation detected"},
-		
-			]};
-
-	var sensorPOIs = {"pois": [
-								{"lat": 37.5315219, 
-									"lon": -77.4289258, 
-									"type": "SensorGeneric", 
-									"height": 55,
-									"content": "V Detector #3 \nVoltage: 599"},
-								// {"lat": 37.5316718, 
-								// 	"lon": -77.4294247, 
-								// 	"type": "SensorGeneric", 
-								// 	"content": "Voltage Detector #4 \nVoltage: 599.8"},		
-								{"lat": 37.5318271, 
-									"lon": -77.4301372, 
-									"type": "SensorGeneric", 
-									"height": 45,
-									"content": "V Detector #5 \nVoltage: 601.5"},	
-								// {"lat": 37.5319175, 
-								// 	"lon": -77.4307823, 
-								// 	"type": "SensorGeneric", 
-								// 	"content": "Voltage Detector #6 \nVoltage: 601.5"},
-								// {"lat": 37.5319983, 
-								// 	"lon": -77.4312519, 
-								// 	"type": "SensorGeneric", 
-								// 	"height": 55,
-								// 	"content": "V Detector #7 \nVoltage: 600.6"},
-								{"lat": 37.532094, 
-									"lon": -77.4318125, 
-									"type": "SensorGeneric", 
-									"height": 65,
-									"content": "V Detector #8 \nVoltage: 601.5"},
-								{"lat": 37.5321802, 
-									"lon": -77.4323719, 
-									"type": "SensorGeneric", 
-									"height": 75,
-									"content": "V Detector #9 \nVoltage: 599.1"},	
-			]};
-
-	setTimeout(function(){
-		addPOI(accidentPOIs);
-		addPOI(radioactivePOIs);
-		addPOI(sensorPOIs);
-		addPOI(warningPOIs);
-
-		enableTraffic();
-	}, mapLoadTime);
-
-}
-
-function useCaseActiveShooterDouble(){
-	useCaseActiveShooter();
-	useCaseActiveShooter();
-}
-
-function useCaseActiveShooter(){
-
-	updateMapLocation(37.526889, -77.451861);
-
-	var policePOIs = {"pois": [
-								{"lat": 37.527453997298124, 
-									"lon": 	-77.45388267315083, 
-									"type": "Police", 
-									"height": 66,
-									"content": "Sgt. Ray Martinez \nShots Fired: 3\nPulse: 119 bpm\nSpO2: 95.1%"},
-								{"lat": 37.527490508593274, 
-									"lon": 	-77.4538472520168, 
-									"type": "Police", 
-									"height": 45,
-									"content": "Lieut. Joe West \nShots Fired: 4\nPulse: 109 bpm\nSpO2: 95.8%"},
-			]};
-
-	var shootingPOIs = {"pois": [
-								{"lat": 37.5274504, 
-									"lon": -77.45391, 
-									"type": "Shooting", 
-									"height": 80,
-									"content": "Firearm Activity \nMultiple gunshots"},
-		
-			]};
-
-	var unknownPOIs = {"pois": [
-								{"lat": 37.524674,
-									"lon": -77.455705, 
-									"type": "Unknownpackage", 
-									"height": 60,
-									"content": "Suspicious Object \nSuspected Explosive"},
-		
-			]};
-
-	var warningPOIs = {"pois": [
-								{"lat": 37.525472,  
-									"lon": -77.447247,
-									"type": "Warning", 
-									"height": 70,
-									"content": "Dispatch \nTheft"},
-								{"lat": 37.522268, 
-									"lon": -77.448197, 
-									"type": "Warning", 
-									"height": 60,
-									"content": "Dispatch \nTrespass"},
-		
-			]};
-
-	setTimeout(function(){
-		addPOI(policePOIs);
-		addPOI(shootingPOIs);
-		addPOI(unknownPOIs);
-		addPOI(warningPOIs);
-
-		enableTraffic();
-	}, mapLoadTime);
-
-}
+// Removed: Transportation use case (Richmond, VA) - Not relevant for India-specific project
+// Removed: Active Shooter use case (Richmond, VA) - Not relevant for India-specific project
+// Focus: Floods and Forest Fires in India only
 
 function useCaseFloodDouble(){
 	useCaseFlood();
@@ -207,70 +52,67 @@ function useCaseFloodDouble(){
 }
 
 function useCaseFlood(){
-
-	// iowa city - iihr
-	updateMapLocation(41.656723, -91.541021);
-	//41.650825, -91.538054 - mcdonalds
+	// Mumbai, India - Mithi River area (flood-prone)
+	updateMapLocation(19.0596, 72.8295);
 	
-	extendMap(1,1,1,2);
+	extendMap(1, 1, 1, 1);
 
-
-
-	// update depth value for damage values
+	// Indian flood monitoring sensors - spaced out to avoid overlapping
 	var stageSensorPOIs = {"pois": [
-								{"lat": 41.656723,
-									"lon": 	-91.541021,
-									"type": "Sensor",
+								{"lat": 19.0580,
+									"lon": 72.8270,
+									"type": "StreamSensor",
 									"height": 85,
-									"content": "Stream Gauge\nHeight: 17 ft 4 in\nDischarge: 8,370 ft3/s\nReported: 7/13/20 - 15:00 CDT"},
+									"content": "Mithi River Gauge\nHeight: 2.5 m\nDischarge: 450 m³/s\nReported: Current"},
 			]};
 
 	var variousSensorsPOIs = {"pois": [
-								{"lat": 41.656920,
-									"lon": 	-91.541078,
+								{"lat": 19.0620,
+									"lon": 72.8320,
 									"type": "RainGauge", 
 									"height": 70,
-									"content": "Rain Gauge\nLast Reading: 0.4 in/hr"},
-								{"lat": 41.651573, 
-									"lon": 	-91.543518,
+									"content": "IMD Rain Gauge\nLast Reading: 25 mm/hr\nMonsoon Alert: Active"},
+								{"lat": 19.0640, 
+									"lon": 72.8340,
 									"type": "Soil", 
 									"height": 70,
-									"content": "Hydro Station\nGroundwater Temp: 90.1 F\nSoil Moisture: 19% at 20 inches\nWind: 6 mph from SE"},
+									"content": "Hydro Station\nGroundwater: Normal\nSoil Moisture: 45%\nWind: 15 km/h from SW"},
 		
 			]};
 
 	var buildingPOIs = {"pois": [
-								{"lat": 41.651668, 
-									"lon": -91.539111, 
+								{"lat": 19.0560, 
+									"lon": 72.8250, 
 									"type": "Damage", 
 									"height": 70,
-									"content": "Damage Estimate \nLinder Tire Service\nStructure Damage: $58,954\nContent Damage: $170,310"},
-								// {"lat": 41.651668, 
-								// 	"lon": -91.539111, 
-								// 	"type": "Damage", 
-								// 	"height": 80,
-								// 	"content": "Damage Estimate \nDairy Queen\nStructure Damage: $801\nContent Damage: $1,602"},
-								{"lat": 41.655218,
-									"lon": -91.539070, 
+									"content": "Damage Estimate\nCommercial Building\nStructure Damage: ₹2.5L\nContent Damage: ₹8.2L"},
+								{"lat": 19.0600,
+									"lon": 72.8290, 
 									"type": "Damage", 
 									"height": 80,
-									"content": "Damage Estimate \nFleet Services - Lot 64\nStructure Damage: 9%\nContent Damage: 26%"},
+									"content": "Damage Estimate\nResidential Complex\nStructure Damage: 12%\nContent Damage: 28%"},
 		
+			]};
+
+	var warningPOIs = {"pois": [
+								{"lat": 19.0615,
+									"lon": 72.8315,
+									"type": "Warning",
+									"height": 60,
+									"content": "Flood Warning\nWater Level: 1.8 m\nEvacuation Recommended"},
 			]};
 
 	addPOI(stageSensorPOIs);
 	addPOI(variousSensorsPOIs);
 	addPOI(buildingPOIs);
-
+	addPOI(warningPOIs);
 
 	setTimeout(function(){
 		generateFlood();
-		adjustFlood(1.2);
+		adjustFlood(0.8); // Adjusted for Indian flood levels
 		gameInstance.SendMessage("CitySimulatorMap", "jsSetLayerInactive", "Water");
-
 		enableTraffic();
 	}, mapLoadTime);
-
 }
 
 function useCaseFireDouble(){
@@ -279,54 +121,53 @@ function useCaseFireDouble(){
 }
 
 function useCaseFire(){
-
-	updateMapLocation(32.380616, -110.953647);
-	//
-	//32.378172, -110.948663
+	// Indian forest fire location - Uttarakhand (Himalayan region, common forest fire area)
+	// Alternative: Maharashtra forest area (19.3, 73.8) or Karnataka Western Ghats
+	updateMapLocation(30.3165, 79.0193); // Uttarakhand forest area
 
 	var firePOIs = {"pois": [
-								{"lat": 32.378172,
-									"lon": 	-110.948663,
+								{"lat": 30.3165,
+									"lon": 79.0193,
 									"type": "N/A",
 									"height": 0,
 									"content": ""},
 			]};
 
 	var fireDataPOIs = {"pois": [
-								{"lat": 32.378172,
-									"lon": 	-110.948663,
+								{"lat": 30.3140,
+									"lon": 79.0170,
 									"type": "FireData",
 									"height": 205,
-									"content": "Wildfire at Bighorn\nCause: Lightning\nFuels Involved: Grass/Brush"},
+									"content": "Forest Fire - Uttarakhand\nCause: Dry Weather\nFuels: Pine/Deodar Forest\nArea Affected: 15 hectares"},
 			]};
 
 	var smokePOIs = {"pois": [
-								{"lat": 32.378398, 
-									"lon": 	-110.953461,
+								{"lat": 30.3200, 
+									"lon": 79.0220,
 									"type": "SensorGeneric",
 									"height": 205,
-									"content": "Air Quality Sensor\nO2: 18.5%\nCO: 36.4 ppm\nHCN: 5.3 ppm\nLel: 82.2%\nParticles: 230 mg/m3"},
+									"content": "Air Quality Sensor\nO2: 19.2%\nCO: 28.5 ppm\nPM2.5: 185 μg/m³\nVisibility: 2 km"},
 			]};
 
 	var spottedPeoplePOIs = {"pois": [
-								{"lat": 32.379904, 
-									"lon": 	-110.947419,
+								{"lat": 30.3180, 
+									"lon": 79.0200,
 									"type": "SensorGeneric",
 									"height": 215,
-									"content": "Stranded People \nGroup of 6"},
+									"content": "Evacuation Required\nVillage: 3 km away\nPeople at Risk: 120"},
 			]};
 
 	var firemanPOIs = {"pois": [
-								{"lat": 32.379030, 
-									"lon": 	-110.950414, 
+								{"lat": 30.3120, 
+									"lon": 79.0150, 
 									"type": "Fireman", 
 									"height": 200,
-									"content": "Firefighter Corey Perry \nPulse: 119 bpm\nSpO2: 95.1%"},
-								{"lat": 32.379328, 
-									"lon": 	-110.950848, 
+									"content": "Forest Officer Rajesh Kumar\nPulse: 112 bpm\nSpO2: 96.2%\nTeam: 8 personnel"},
+								{"lat": 30.3160, 
+									"lon": 79.0190, 
 									"type": "Fireman", 
 									"height": 220,
-									"content": "Fire Chief Sarah Allen \nPulse: 109 bpm\nSpO2: 95.8%"},
+									"content": "Fire Chief Priya Sharma\nPulse: 105 bpm\nSpO2: 96.5%\nCoordination: Active"},
 			]};
 
 	setTimeout(function(){
@@ -359,51 +200,5 @@ function adjustFlood(level){
 }
 
 function setUserName(){
-	gameInstance.SendMessage("CameraMain", "jsSetProfile", "Yusuf Sermet");	
-}
-
-// Indian Location Test Case - Mumbai
-function useCaseMumbai(){
-	// Mumbai coordinates - near Bandra Kurla Complex
-	updateMapLocation(19.0596, 72.8295);
-	
-	// Extend map to show more area
-	extendMap(1, 1, 1, 1);
-	
-	// Mumbai-specific POIs for flood scenario
-	var mumbaiFloodPOIs = {"pois": [
-		{"lat": 19.0596,
-			"lon": 72.8295,
-			"type": "StreamSensor", 
-			"height": 85,
-			"content": "Mithi River Gauge\nHeight: 2.5 m\nDischarge: 450 m3/s\nReported: Current"},
-		{"lat": 19.0610,
-			"lon": 72.8310,
-			"type": "RainGauge", 
-			"height": 70,
-			"content": "IMD Rain Gauge\nLast Reading: 25 mm/hr\nMonsoon Alert: Active"},
-		{"lat": 19.0580,
-			"lon": 72.8280,
-			"type": "Damage", 
-			"height": 70,
-			"content": "Flood Damage Estimate\nCommercial Building\nStructure Damage: ₹2.5L\nContent Damage: ₹8.2L"},
-		{"lat": 19.0605,
-			"lon": 72.8300,
-			"type": "Warning", 
-			"height": 60,
-			"content": "Flood Warning\nWater Level: 1.8m\nEvacuation Recommended"},
-		{"lat": 19.0620,
-			"lon": 72.8320,
-			"type": "SensorGeneric",
-			"height": 55,
-			"content": "Traffic Sensor\nCongestion: High\nAlternate Routes: Available"}
-	]};
-	
-	// Add POIs after map loads
-	setTimeout(function(){
-		addPOI(mumbaiFloodPOIs);
-		generateFlood();
-		adjustFlood(0.8); // Lower flood level for Mumbai test
-		enableTraffic();
-	}, mapLoadTime);
+	gameInstance.SendMessage("CameraMain", "jsSetProfile", "India User");	
 }

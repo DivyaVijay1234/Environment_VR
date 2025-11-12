@@ -22,7 +22,8 @@
 .smallscreen {
 	width: 40%;
 	max-width: 600px;
-	overflow: hidden;	
+	overflow: hidden;
+	z-index: 5;
 }
 
 .panel{
@@ -54,6 +55,7 @@
     position: relative;
     width: 75%;
     height: 100%;
+    overflow: hidden;
 }
 
 #map-canvas {
@@ -70,6 +72,24 @@
     right: 0;
     position: absolute;
     padding: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 10;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+}
+
+#risk-panel .title {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    margin-top: 15px;
+}
+
+#risk-panel .button {
+    margin-bottom: 15px;
+}
+
+#risk-panel .is-divider {
+    margin: 20px 0;
 }
 
 #progress {

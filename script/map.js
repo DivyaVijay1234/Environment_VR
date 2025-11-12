@@ -1,16 +1,17 @@
 var map;
 
 var currentLocation = {
-	address: "300 S. Riverside Dr.",
-	postalcode: "52246",
-	county: "Johnson County"
+	address: "Mumbai, Maharashtra",
+	postalcode: "400001",
+	county: "Mumbai"
 };
 
 function initializeMap(){
 	console.log('initializing map');
+	// Default to Mumbai, India - Mithi River area
 	var mapOptions = {
-		center: new google.maps.LatLng(41.657500, -91.540512),
-		zoom: 19,
+		center: new google.maps.LatLng(19.0596, 72.8295),
+		zoom: 16,
 		mapTypeId: google.maps.MapTypeId.TERRAIN,
 		disableDefaultUI: false,
 	};
