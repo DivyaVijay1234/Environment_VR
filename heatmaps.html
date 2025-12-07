@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Prediction Heatmaps - India</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.4/css/bulma.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .heatmap-container {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .performance-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .metric {
+            display: inline-block;
+            margin: 10px 20px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .back-button {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-button">
+            <a href="index.html" class="button is-primary">← Back to Main</a>
+        </div>
+
+        <h1 class="title is-1">Disaster Prediction Heatmaps - India</h1>
+        <p class="subtitle">Parallel Processing Performance Analysis</p>
+
+        <!-- Performance Metrics -->
+        <div class="performance-box" id="performanceBox" style="display: none;">
+            <h2 class="title is-4" style="color: white;">Performance Metrics</h2>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-value" id="parallelTime">-</div>
+                    <div class="metric-label">Parallel Time (s)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="sequentialTime">-</div>
+                    <div class="metric-label">Sequential Time (s)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="speedup">-</div>
+                    <div class="metric-label">Speedup (x)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="accuracy">-</div>
+                    <div class="metric-label">Model Accuracy</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="cpuCores">-</div>
+                    <div class="metric-label">CPU Cores Used</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flood Heatmap -->
+        <div class="heatmap-container">
+            <h2 class="title is-3">Flood Risk Prediction by State</h2>
+            <p class="subtitle">Probability of flood occurrence (0 = Low Risk, 1 = High Risk)</p>
+            <div id="floodHeatmap" style="height: 600px;"></div>
+        </div>
+
+        <!-- Forest Fire Heatmap -->
+        <div class="heatmap-container">
+            <h2 class="title is-3">Forest Fire Risk Prediction by State</h2>
+            <p class="subtitle">Normalized fire incident probability based on historical data</p>
+            <div id="forestfireHeatmap" style="height: 600px;"></div>
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="button is-info is-large" onclick="refreshData()">🔄 Refresh Predictions</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api/predictions';
+
+        async function loadPredictions() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                // Display performance metrics
+                if (data.performance) {
+                    document.getElementById('performanceBox').style.display = 'block';
+                    document.getElementById('parallelTime').textContent = data.performance.parallel_time.toFixed(2);
+                    document.getElementById('sequentialTime').textContent = data.performance.sequential_time.toFixed(2);
+                    document.getElementById('speedup').textContent = data.performance.speedup.toFixed(2) + 'x';
+                    document.getElementById('accuracy').textContent = (data.performance.accuracy * 100).toFixed(2) + '%';
+                    document.getElementById('cpuCores').textContent = data.performance.cpu_cores_used;
+                }
+
+                // Create flood heatmap
+                createHeatmap('floodHeatmap', data.flood_predictions, 'Flood Risk Probability', 'RdYlBu');
+
+                // Create forest fire heatmap
+                createHeatmap('forestfireHeatmap', data.forestfire_predictions, 'Forest Fire Risk Probability', 'Oranges');
+
+            } catch (error) {
+                console.error('Error loading predictions:', error);
+                alert('Error loading predictions. Make sure the API server is running on port 5000.');
+            }
+        }
+
+        function createHeatmap(containerId, predictions, title, colorscale) {
+            const states = Object.keys(predictions);
+            const values = Object.values(predictions);
+
+            const data = [{
+                type: 'bar',
+                x: states,
+                y: values,
+                marker: {
+                    color: values,
+                    colorscale: colorscale,
+                    showscale: true,
+                    colorbar: {
+                        title: 'Risk Level',
+                        titleside: 'right'
+                    }
+                },
+                text: values.map(v => (v * 100).toFixed(1) + '%'),
+                textposition: 'outside'
+            }];
+
+            const layout = {
+                title: title,
+                xaxis: {
+                    title: 'Indian States/UTs',
+                    tickangle: -45
+                },
+                yaxis: {
+                    title: 'Probability (0-1)',
+                    range: [0, 1]
+                },
+                height: 600,
+                margin: { b: 150 }
+            };
+
+            Plotly.newPlot(containerId, data, layout);
+        }
+
+        async function refreshData() {
+            try {
+                const response = await fetch(API_URL + '/refresh', { method: 'POST' });
+                const data = await response.json();
+                
+                // Reload the page data
+                loadPredictions();
+                alert('Predictions refreshed successfully!');
+            } catch (error) {
+                console.error('Error refreshing predictions:', error);
+                alert('Error refreshing predictions.');
+            }
+        }
+
+        // Load data on page load
+        loadPredictions();
+    </script>
+</body>
+</html>
+

@@ -9,9 +9,10 @@ var currentLocation = {
 function initializeMap(){
 	console.log('initializing map');
 	// Default to Mumbai, India - Mithi River area
+	// Using zoom level 14 for better overview (was 16, too zoomed in)
 	var mapOptions = {
 		center: new google.maps.LatLng(19.0596, 72.8295),
-		zoom: 16,
+		zoom: 14,
 		mapTypeId: google.maps.MapTypeId.TERRAIN,
 		disableDefaultUI: false,
 	};

@@ -6,8 +6,24 @@ document.getElementById("resizeButton").addEventListener("click", function(){
   xrcontainer.classList.toggle("smallscreen");
 });
 
-function updateMapLocation(lat, lon, zoom=16){
+// Global variable to track current map parameters
+var mapParams = {"lat": 19.0596, "lon": 72.8295, "zoom": 14};
+
+function updateMapLocation(lat, lon, zoom=14){
 	mapParams = {"lat": lat, "lon": lon, "zoom": zoom};
+	var paramsJSON = JSON.stringify(mapParams);
+	gameInstance.SendMessage("CitySimulatorMap", "jsSetMap", paramsJSON);
+}
+
+// Function to zoom out for better fullscreen view
+function zoomOutView(zoomLevel=12){
+	// Use current map location, just change zoom level
+	if (mapParams && mapParams.lat && mapParams.lon) {
+		mapParams.zoom = zoomLevel;
+	} else {
+		// Default to Mumbai if no location set
+		mapParams = {"lat": 19.0596, "lon": 72.8295, "zoom": zoomLevel};
+	}
 	var paramsJSON = JSON.stringify(mapParams);
 	gameInstance.SendMessage("CitySimulatorMap", "jsSetMap", paramsJSON);
 }
@@ -53,7 +69,8 @@ function useCaseFloodDouble(){
 
 function useCaseFlood(){
 	// Mumbai, India - Mithi River area (flood-prone)
-	updateMapLocation(19.0596, 72.8295);
+	// Using zoom level 14 for better overview (was 16, too zoomed in)
+	updateMapLocation(19.0596, 72.8295, 14);
 	
 	extendMap(1, 1, 1, 1);
 
@@ -121,61 +138,69 @@ function useCaseFireDouble(){
 }
 
 function useCaseFire(){
-	// Indian forest fire location - Uttarakhand (Himalayan region, common forest fire area)
-	// Alternative: Maharashtra forest area (19.3, 73.8) or Karnataka Western Ghats
-	updateMapLocation(30.3165, 79.0193); // Uttarakhand forest area
+	// Indian forest fire location - Using a flatter forest area to ensure fire appears on ground
+	// Using a location in Maharashtra forest area (flatter terrain) instead of high-altitude Uttarakhand
+	// Using zoom level 14 for better overview (was 16, too zoomed in)
+	updateMapLocation(19.0760, 73.8777, 14); // Maharashtra forest area (near Mumbai, flatter terrain)
 
+	// Fire POI - height set to 0 to ensure it burns on ground/terrain surface
+	// Using flatter terrain location to prevent fire from appearing in sky
 	var firePOIs = {"pois": [
-								{"lat": 30.3165,
-									"lon": 79.0193,
+								{"lat": 19.0760,
+									"lon": 73.8777,
 									"type": "N/A",
 									"height": 0,
 									"content": ""},
 			]};
 
 	var fireDataPOIs = {"pois": [
-								{"lat": 30.3140,
-									"lon": 79.0170,
+								{"lat": 19.0760,
+									"lon": 73.8777,
 									"type": "FireData",
-									"height": 205,
-									"content": "Forest Fire - Uttarakhand\nCause: Dry Weather\nFuels: Pine/Deodar Forest\nArea Affected: 15 hectares"},
+									"height": 50,
+									"content": "Forest Fire - Maharashtra\nCause: Dry Weather\nFuels: Mixed Forest\nArea Affected: 15 hectares"},
 			]};
 
 	var smokePOIs = {"pois": [
-								{"lat": 30.3200, 
-									"lon": 79.0220,
+								{"lat": 19.0780, 
+									"lon": 73.8800,
 									"type": "SensorGeneric",
-									"height": 205,
+									"height": 50,
 									"content": "Air Quality Sensor\nO2: 19.2%\nCO: 28.5 ppm\nPM2.5: 185 μg/m³\nVisibility: 2 km"},
 			]};
 
 	var spottedPeoplePOIs = {"pois": [
-								{"lat": 30.3180, 
-									"lon": 79.0200,
+								{"lat": 19.0740, 
+									"lon": 73.8750,
 									"type": "SensorGeneric",
-									"height": 215,
+									"height": 60,
 									"content": "Evacuation Required\nVillage: 3 km away\nPeople at Risk: 120"},
 			]};
 
 	var firemanPOIs = {"pois": [
-								{"lat": 30.3120, 
-									"lon": 79.0150, 
+								{"lat": 19.0720, 
+									"lon": 73.8730, 
 									"type": "Fireman", 
-									"height": 200,
+									"height": 45,
 									"content": "Forest Officer Rajesh Kumar\nPulse: 112 bpm\nSpO2: 96.2%\nTeam: 8 personnel"},
-								{"lat": 30.3160, 
-									"lon": 79.0190, 
+								{"lat": 19.0770, 
+									"lon": 73.8780, 
 									"type": "Fireman", 
-									"height": 220,
+									"height": 55,
 									"content": "Fire Chief Priya Sharma\nPulse: 105 bpm\nSpO2: 96.5%\nCoordination: Active"},
 			]};
 
+	// Delay fire generation to ensure terrain is fully loaded before placing fire on ground
 	setTimeout(function(){
-		generateFire(firePOIs);
+		// First add POIs
 		addPOI(fireDataPOIs);
 		addPOI(smokePOIs);
 		addPOI(firemanPOIs);
 		addPOI(spottedPeoplePOIs);
+		// Then generate fire on ground surface after a small additional delay
+		setTimeout(function(){
+			generateFire(firePOIs);
+		}, 500);
 		enableTraffic();
 	}, mapLoadTime);
 }
