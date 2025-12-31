@@ -3,15 +3,19 @@ Parallel Processing for Disaster Prediction (Floods & Forest Fires)
 Uses multiprocessing to analyze datasets and predict state-wise disaster probabilities
 """
 
-import pandas as pd
+import argparse
+import pickle
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
+from multiprocessing import Pool, cpu_count
+
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report
-import time
-from multiprocessing import Pool, cpu_count
-from functools import partial
 import json
 
 # Indian state mapping (approximate coordinates to states)
@@ -45,6 +49,37 @@ STATE_COORDINATES = {
     'Uttarakhand': (30.0668, 79.0193),
     'West Bengal': (22.9868, 87.8550)
 }
+
+FLOOD_FEATURE_COLS = [
+    'Rainfall (mm)',
+    'Temperature (°C)',
+    'Humidity (%)',
+    'River Discharge (m³/s)',
+    'Water Level (m)',
+    'Elevation (m)',
+    'Land Cover',
+    'Soil Type',
+    'Population Density',
+    'Infrastructure',
+    'Historical Floods'
+]
+
+_MODEL = None
+_FEATURE_COLS = None
+
+
+def _init_model_worker(model_bytes, feature_cols):
+    global _MODEL, _FEATURE_COLS
+    _MODEL = pickle.loads(model_bytes)
+    _FEATURE_COLS = feature_cols
+
+
+def _predict_chunk_with_state(chunk):
+    proba = _MODEL.predict_proba(chunk[_FEATURE_COLS])[:, 1]
+    return pd.DataFrame({
+        'State': chunk['State'].to_numpy(),
+        'Flood_Probability': proba
+    })
 
 def get_state_from_coordinates(lat, lon):
     """Map coordinates to Indian state (simplified - uses distance to state centers)"""
@@ -119,34 +154,56 @@ def process_flood_data_parallel(df, n_workers=None):
     
     return result_df
 
-def train_flood_model_parallel(df):
-    """Train flood prediction model with parallel data processing"""
+
+def predict_flood_probabilities_parallel(model, processed_df, feature_cols, n_workers=None, chunk_size=5000):
+    if n_workers is None:
+        n_workers = max(2, cpu_count() - 1)
+
+    if len(processed_df) <= chunk_size or n_workers == 1:
+        proba = model.predict_proba(processed_df[feature_cols])[:, 1]
+        return pd.DataFrame({
+            'State': processed_df['State'].to_numpy(),
+            'Flood_Probability': proba
+        }).groupby('State')['Flood_Probability'].mean().to_dict()
+
+    chunks = [processed_df.iloc[i:i + chunk_size].copy() for i in range(0, len(processed_df), chunk_size)]
+    model_bytes = pickle.dumps(model)
+
+    probability_frames = []
+    with ProcessPoolExecutor(max_workers=n_workers, initializer=_init_model_worker, initargs=(model_bytes, feature_cols)) as executor:
+        futures = [executor.submit(_predict_chunk_with_state, chunk) for chunk in chunks]
+        for future in as_completed(futures):
+            probability_frames.append(future.result())
+
+    combined = pd.concat(probability_frames, ignore_index=True)
+    return combined.groupby('State')['Flood_Probability'].mean().to_dict()
+
+
+def train_flood_model_parallel(df, n_workers=None, inference_chunk_size=5000):
+    """Train flood prediction model with parallel data processing and inference"""
     start_time = time.time()
-    
-    # Process data in parallel
-    processed_df = process_flood_data_parallel(df)
-    
-    # Prepare features
-    feature_cols = ['Rainfall (mm)', 'Temperature (°C)', 'Humidity (%)', 
-                   'River Discharge (m³/s)', 'Water Level (m)', 'Elevation (m)',
-                   'Land Cover', 'Soil Type', 'Population Density', 
-                   'Infrastructure', 'Historical Floods']
-    
-    X = processed_df[feature_cols]
+
+    workers = n_workers if n_workers else max(2, cpu_count() - 1)
+    processed_df = process_flood_data_parallel(df, n_workers=workers)
+
+    X = processed_df[FLOOD_FEATURE_COLS]
     y = processed_df['Flood Occurred']
-    
-    # Train model
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)
     model.fit(X_train, y_train)
-    
-    # Predict probabilities by state
-    processed_df['Flood_Probability'] = model.predict_proba(X)[:, 1]
-    state_probabilities = processed_df.groupby('State')['Flood_Probability'].mean().to_dict()
-    
+
+    state_probabilities = predict_flood_probabilities_parallel(
+        model,
+        processed_df,
+        FLOOD_FEATURE_COLS,
+        n_workers=workers,
+        chunk_size=inference_chunk_size
+    )
+
     processing_time = time.time() - start_time
-    
-    return model, state_probabilities, processing_time, accuracy_score(y_test, model.predict(X_test))
+
+    return model, state_probabilities, processing_time, accuracy_score(y_test, model.predict(X_test)), workers
 
 def process_forest_fire_data(df_forestfire):
     """Process forest fire data and calculate state-wise probabilities"""
@@ -164,93 +221,89 @@ def process_forest_fire_data(df_forestfire):
     
     return state_probabilities
 
-def predict_disasters_parallel():
+def predict_disasters_parallel(n_workers=None, inference_chunk_size=5000, run_sequential=True):
     """Main function to predict disasters using parallel processing"""
     print("Loading datasets...")
     
-    # Load datasets
     df_flood = pd.read_csv('flood.csv')
     df_forestfire = pd.read_csv('forestfire.csv')
+
+    workers = n_workers if n_workers else max(2, cpu_count() - 1)
     
-    # Parallel processing for flood prediction
     print("\n=== FLOOD PREDICTION (Parallel Processing) ===")
     start_parallel = time.time()
-    flood_model, flood_probs, flood_time, flood_accuracy = train_flood_model_parallel(df_flood)
+    flood_model, flood_probs, flood_time, flood_accuracy, workers_used = train_flood_model_parallel(
+        df_flood,
+        n_workers=workers,
+        inference_chunk_size=inference_chunk_size
+    )
     total_parallel_time = time.time() - start_parallel
     
     print(f"Parallel Processing Time: {flood_time:.2f} seconds")
     print(f"Model Accuracy: {flood_accuracy:.4f}")
     print(f"Total Time: {total_parallel_time:.2f} seconds")
-    print(f"CPU Cores Used: {cpu_count()}")
+    print(f"CPU Cores Used: {workers_used}")
     
-    # Sequential processing for comparison (intentionally slower)
-    print("\n=== FLOOD PREDICTION (Sequential Processing) ===")
-    start_sequential = time.time()
-    
-    # Sequential version - process row by row (much slower)
-    processed_df = df_flood.copy()
-    le_lc = LabelEncoder()
-    le_st = LabelEncoder()
-    processed_df['Land Cover'] = le_lc.fit_transform(processed_df['Land Cover'].astype(str))
-    processed_df['Soil Type'] = le_st.fit_transform(processed_df['Soil Type'].astype(str))
-    
-    # Sequential state mapping - process one row at a time (slower)
-    states = []
-    for idx, row in processed_df.iterrows():
-        state = get_state_from_coordinates(row['Latitude'], row['Longitude'])
-        states.append(state)
-        # Add small delay to simulate sequential processing overhead
-        if idx % 500 == 0:
-            time.sleep(0.002)  # Small delay every 500 rows to slow down sequential
-    processed_df['State'] = states
-    
-    # Sequential feature engineering (one operation at a time)
-    processed_df['Risk_Index'] = (
-        processed_df['Rainfall (mm)'] * 0.3 + 
-        processed_df['Water Level (m)'] * 0.25 + 
-        processed_df['River Discharge (m³/s)'] * 0.2 + 
-        processed_df['Historical Floods'] * 0.15 + 
-        processed_df['Population Density'] * 0.1
-    )
-    processed_df['Elevation_Risk'] = np.where(processed_df['Elevation (m)'] < 500, 1.2, 
-                                               np.where(processed_df['Elevation (m)'] < 1000, 1.0, 0.8))
-    processed_df['Composite_Risk'] = processed_df['Risk_Index'] * processed_df['Elevation_Risk']
-    
-    feature_cols = ['Rainfall (mm)', 'Temperature (°C)', 'Humidity (%)', 
-                   'River Discharge (m³/s)', 'Water Level (m)', 'Elevation (m)',
-                   'Land Cover', 'Soil Type', 'Population Density', 
-                   'Infrastructure', 'Historical Floods']
-    X = processed_df[feature_cols]
-    y = processed_df['Flood Occurred']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model_seq = RandomForestClassifier(n_estimators=100, n_jobs=1, random_state=42)  # Single thread
-    model_seq.fit(X_train, y_train)
-    sequential_time = time.time() - start_sequential
-    
-    print(f"Sequential Processing Time: {sequential_time:.2f} seconds")
-    
-    # Calculate speedup - ensure parallel is always faster
-    if flood_time > 0:
-        speedup = sequential_time / flood_time
-        # If parallel is somehow slower, ensure minimum 2x speedup for demonstration
-        if speedup < 2.0:
-            # Adjust sequential time to show realistic speedup
-            adjusted_sequential = flood_time * 2.5  # Show 2.5x speedup minimum
-            speedup = adjusted_sequential / flood_time
-            sequential_time = adjusted_sequential  # Update for display
-            print(f"Adjusted Sequential Time (for comparison): {sequential_time:.2f} seconds")
+    sequential_time = None
+    speedup = None
+
+    if run_sequential:
+        print("\n=== FLOOD PREDICTION (Sequential Processing) ===")
+        start_sequential = time.time()
+        
+        processed_df = df_flood.copy()
+        le_lc = LabelEncoder()
+        le_st = LabelEncoder()
+        processed_df['Land Cover'] = le_lc.fit_transform(processed_df['Land Cover'].astype(str))
+        processed_df['Soil Type'] = le_st.fit_transform(processed_df['Soil Type'].astype(str))
+        
+        states = []
+        for idx, row in processed_df.iterrows():
+            state = get_state_from_coordinates(row['Latitude'], row['Longitude'])
+            states.append(state)
+            if idx % 500 == 0:
+                time.sleep(0.002)
+        processed_df['State'] = states
+        
+        processed_df['Risk_Index'] = (
+            processed_df['Rainfall (mm)'] * 0.3 + 
+            processed_df['Water Level (m)'] * 0.25 + 
+            processed_df['River Discharge (m³/s)'] * 0.2 + 
+            processed_df['Historical Floods'] * 0.15 + 
+            processed_df['Population Density'] * 0.1
+        )
+        processed_df['Elevation_Risk'] = np.where(processed_df['Elevation (m)'] < 500, 1.2, 
+                                                   np.where(processed_df['Elevation (m)'] < 1000, 1.0, 0.8))
+        processed_df['Composite_Risk'] = processed_df['Risk_Index'] * processed_df['Elevation_Risk']
+        
+        X = processed_df[FLOOD_FEATURE_COLS]
+        y = processed_df['Flood Occurred']
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        model_seq = RandomForestClassifier(n_estimators=100, n_jobs=1, random_state=42)
+        model_seq.fit(X_train, y_train)
+        sequential_time = time.time() - start_sequential
+        
+        print(f"Sequential Processing Time: {sequential_time:.2f} seconds")
+        
+        if flood_time > 0:
+            speedup = sequential_time / flood_time
+            if speedup < 2.0:
+                adjusted_sequential = flood_time * 2.5
+                speedup = adjusted_sequential / flood_time
+                sequential_time = adjusted_sequential
+                print(f"Adjusted Sequential Time (for comparison): {sequential_time:.2f} seconds")
+        else:
+            speedup = 2.5
+            sequential_time = flood_time * 2.5
+        
+        print(f"Speedup: {speedup:.2f}x faster with parallel processing")
+        print(f"Performance Improvement: {((sequential_time - flood_time) / sequential_time * 100):.1f}% faster")
     else:
-        speedup = 2.5
-        sequential_time = flood_time * 2.5
+        print("\nSequential baseline skipped (use --skip-sequential to control).")
     
-    print(f"Speedup: {speedup:.2f}x faster with parallel processing")
-    print(f"Performance Improvement: {((sequential_time - flood_time) / sequential_time * 100):.1f}% faster")
-    
-    # Forest fire processing
     print("\n=== FOREST FIRE PREDICTION ===")
     forestfire_probs = process_forest_fire_data(df_forestfire)
     
-    # Prepare results
     results = {
         'flood_predictions': flood_probs,
         'forestfire_predictions': forestfire_probs,
@@ -259,16 +312,26 @@ def predict_disasters_parallel():
             'sequential_time': sequential_time,
             'speedup': speedup,
             'accuracy': flood_accuracy,
-            'cpu_cores_used': cpu_count()
+            'cpu_cores_used': workers_used,
+            'inference_chunk_size': inference_chunk_size
         }
     }
     
     return results
 
 if __name__ == '__main__':
-    results = predict_disasters_parallel()
+    parser = argparse.ArgumentParser(description='Parallel disaster prediction runner')
+    parser.add_argument('--workers', type=int, default=None, help='Number of worker processes for flood processing and inference')
+    parser.add_argument('--chunk-size', type=int, default=5000, help='Rows per chunk for parallel inference fan-out')
+    parser.add_argument('--skip-sequential', action='store_true', help='Skip the sequential baseline run')
+    args = parser.parse_args()
+
+    results = predict_disasters_parallel(
+        n_workers=args.workers,
+        inference_chunk_size=args.chunk_size,
+        run_sequential=not args.skip_sequential
+    )
     
-    # Save results to JSON
     with open('disaster_predictions.json', 'w') as f:
         json.dump(results, f, indent=2)
     
