@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Prediction Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+            min-width: 120px;
+        }
+        
+        input[type="number"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            padding: 20px 30px;
+        }
+        
+        button {
+            padding: 12px 30px;
+            font-size: 1em;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-pipeline {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-pipeline:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-no-pipeline {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .btn-no-pipeline:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+        }
+        
+        .btn-reset {
+            background: #f56565;
+            color: white;
+        }
+        
+        .btn-reset:hover {
+            background: #e53e3e;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 101, 101, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .content {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .panel {
+            background: #f9fafb;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .panel h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .state-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .state-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #ddd;
+            transition: all 0.2s ease;
+        }
+        
+        .state-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .state-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .risk-bar {
+            flex: 1;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            margin: 0 15px;
+            overflow: hidden;
+        }
+        
+        .risk-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #48bb78 0%, #f6ad55 50%, #f56565 100%);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        
+        .risk-value {
+            font-weight: 600;
+            min-width: 45px;
+            text-align: right;
+            color: #666;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-left: 10px;
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .pipeline-banner {
+            background: #edf2f7;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            white-space: pre-wrap;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .stats {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .stat-value {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .combined-map {
+            grid-column: 1 / -1;
+        }
+        
+        .top-risks {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .risk-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .risk-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .risk-card .risk-values {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 0.9em;
+        }
+        
+        .risk-card .risk-values div {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #c53030;
+        }
+        
+        .success {
+            background: #c6f6d5;
+            color: #22543d;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #48bb78;
+        }
+        
+        .pipeline-comparison {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .execution-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            text-align: center;
+        }
+        
+        .execution-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+        
+        .execution-card .time {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .execution-card .speedup {
+            background: #edf2f7;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        
+        .execution-card .description {
+            font-size: 0.85em;
+            color: #666;
+            line-height: 1.4;
+        }
+        
+        .improvement-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        .improvement-banner h5 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .improvement-stats {
+            display: flex;
+            justify-content: space-around;
+            gap: 20px;
+        }
+        
+        .improvement-stat {
+            flex: 1;
+        }
+        
+        .improvement-stat .label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .improvement-stat .value {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌍 Disaster Risk Dashboard</h1>
+            <p>Parallel Processing for Flood & Forest Fire Predictions</p>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="workers">Workers:</label>
+                <input type="number" id="workers" placeholder="Auto (all cores - 1)" min="1" max="64">
+            </div>
+            
+            <div class="control-group">
+                <label for="chunkSize">Chunk Size:</label>
+                <input type="number" id="chunkSize" value="5000" min="100" max="50000" step="500">
+            </div>
+            
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="skipSequential" checked>
+                    Skip Sequential
+                </label>
+                <label>
+                    <input type="checkbox" id="showPipeline" checked>
+                    Show Pipeline
+                </label>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-pipeline" onclick="runWithPipeline()">▶ Run with Pipeline</button>
+            <button class="btn-no-pipeline" onclick="runNoPipeline()">▶ Run (Fast)</button>
+            <button class="btn-reset" onclick="resetAndReload()">↺ Reset</button>
+        </div>
+        
+        <div id="status" style="padding: 0 30px;"></div>
+        
+        <div class="content">
+            <div class="panel">
+                <h2>📊 Combined Risk Map</h2>
+                <div id="combinedMap" class="combined-map"></div>
+            </div>
+            
+            <div class="panel">
+                <h2>📈 Performance Metrics</h2>
+                <div class="stats" id="stats"></div>
+            </div>
+            
+            <div class="panel">
+                <h2>⚙️ Pipeline Advantage Analysis</h2>
+                <div id="pipelineAdvantage"></div>
+            </div>
+            
+            <div class="panel">
+                <h2>🌊 Flood Risk by State</h2>
+                <div class="state-list" id="floodStates"></div>
+            </div>
+            
+            <div class="panel">
+                <h2>🔥 Fire Risk by State</h2>
+                <div class="state-list" id="fireStates"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:5000';
+        
+        function getParams() {
+            return {
+                workers: document.getElementById('workers').value ? parseInt(document.getElementById('workers').value) : null,
+                chunk_size: parseInt(document.getElementById('chunkSize').value),
+                skip_sequential: document.getElementById('skipSequential').checked,
+                show_pipeline: document.getElementById('showPipeline').checked
+            };
+        }
+        
+        function setLoading(show) {
+            const status = document.getElementById('status');
+            if (show) {
+                status.innerHTML = '<div class="loading">Running predictions</div>';
+            } else {
+                status.innerHTML = '';
+            }
+        }
+        
+        function displayPipeline(show) {
+            const combinedMap = document.getElementById('combinedMap');
+            if (show) {
+                combinedMap.innerHTML = `
+                    <div class="pipeline-banner">=== PIPELINE OVERVIEW (CPU-ONLY) ===
+Shared stages help both hazards reuse work and keep cores busy:
+  [1] Load/Parse CSVs (flood.csv, forestfire.csv)
+      └─ Shared I/O; chunked reads can feed both paths
+  [2] Encode & Feature Engineering (parallel over chunks)
+      └─ Reuse encoders + state mapping for flood; fire uses fast averages
+  [3] Predict (parallel RandomForest on flood; fire is aggregated counts)
+      └─ Flood inference fanned out via process pool; fire stays light
+  [4] Aggregate per-state (shared reduction step)
+      └─ Combine flood and fire into a single state risk map
+  [5] Persist/Serve
+      └─ disaster_predictions.json drives the overall risk map</div>`;
+            }
+        }
+        
+        function displayRiskBar(probability) {
+            const pct = (probability * 100).toFixed(1);
+            return `
+                <div class="risk-bar">
+                    <div class="risk-fill" style="width: ${pct}%"></div>
+                </div>
+                <span class="risk-value">${pct}%</span>
+            `;
+        }
+        
+        function displayStates(data, containerId) {
+            const container = document.getElementById(containerId);
+            let html = '';
+            
+            for (const [state, prob] of Object.entries(data).sort((a, b) => b[1] - a[1])) {
+                html += `
+                    <div class="state-item">
+                        <span class="state-name">${state}</span>
+                        ${displayRiskBar(prob)}
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html || '<p style="color: #999;">No data available</p>';
+        }
+        
+        function displayCombinedMap(combined) {
+            const container = document.getElementById('combinedMap');
+            const sorted = combined.sort((a, b) => b.combined_risk - a.combined_risk);
+            
+            let html = '<div class="top-risks">';
+            
+            sorted.forEach(item => {
+                const combined_pct = (item.combined_risk * 100).toFixed(1);
+                const flood_pct = (item.flood_probability * 100).toFixed(1);
+                const fire_pct = (item.fire_probability * 100).toFixed(1);
+                
+                html += `
+                    <div class="risk-card">
+                        <h4>${item.state}</h4>
+                        <div class="risk-bar" style="margin-bottom: 10px;">
+                            <div class="risk-fill" style="width: ${combined_pct}%"></div>
+                        </div>
+                        <div class="risk-values">
+                            <div><span>Combined:</span> <strong>${combined_pct}%</strong></div>
+                            <div><span>Flood:</span> <span>${flood_pct}%</span></div>
+                            <div><span>Fire:</span> <span>${fire_pct}%</span></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function displayStats(perf) {
+            const stats = document.getElementById('stats');
+            let html = '<div class="stat-item"><span class="stat-label">Parallel Time:</span><span class="stat-value">' + 
+                       perf.parallel_time.toFixed(2) + 's</span></div>';
+            
+            if (perf.sequential_time) {
+                html += '<div class="stat-item"><span class="stat-label">Sequential Time:</span><span class="stat-value">' + 
+                        perf.sequential_time.toFixed(2) + 's</span></div>';
+                html += '<div class="stat-item"><span class="stat-label">Speedup:</span><span class="stat-value">' + 
+                        perf.speedup.toFixed(2) + 'x</span></div>';
+            }
+            
+            html += '<div class="stat-item"><span class="stat-label">Model Accuracy:</span><span class="stat-value">' + 
+                    (perf.accuracy * 100).toFixed(2) + '%</span></div>';
+            html += '<div class="stat-item"><span class="stat-label">CPU Cores Used:</span><span class="stat-value">' + 
+                    perf.cpu_cores_used + '</span></div>';
+            html += '<div class="stat-item"><span class="stat-label">Inference Chunk:</span><span class="stat-value">' + 
+                    perf.inference_chunk_size + ' rows</span></div>';
+            
+            stats.innerHTML = html;
+        }
+        
+        function displayPipelineAdvantage(pipelineData) {
+            const container = document.getElementById('pipelineAdvantage');
+            
+            let html = '<div class="pipeline-comparison">';
+            
+            // Sequential card
+            html += `
+                <div class="execution-card">
+                    <h4>📉 Sequential</h4>
+                    <div class="time">${pipelineData.sequential.time}s</div>
+                    <div class="speedup">Speedup: ${pipelineData.sequential.speedup}x</div>
+                    <div class="description">${pipelineData.sequential.description}</div>
+                </div>
+            `;
+            
+            // Pipelined card
+            html += `
+                <div class="execution-card" style="border-left-color: #48bb78;">
+                    <h4>📈 Pipelined</h4>
+                    <div class="time" style="color: #48bb78;">${pipelineData.pipelined.time}s</div>
+                    <div class="speedup" style="background: #c6f6d5;">Speedup: ${pipelineData.pipelined.speedup}x</div>
+                    <div class="description">${pipelineData.pipelined.description}</div>
+                </div>
+            `;
+            
+            // Shared Pipeline card
+            html += `
+                <div class="execution-card" style="border-left-color: #f6ad55;">
+                    <h4>⚙️ Shared Pipeline</h4>
+                    <div class="time" style="color: #f6ad55;">${pipelineData.shared.time}s</div>
+                    <div class="speedup" style="background: #fffaf0;">Speedup: ${pipelineData.shared.speedup}x</div>
+                    <div class="description">${pipelineData.shared.description}</div>
+                </div>
+            `;
+            
+            html += '</div>';
+            
+            // Improvement banner
+            html += `
+                <div class="improvement-banner">
+                    <h5>🎯 Performance Gains with Pipelining</h5>
+                    <div class="improvement-stats">
+                        <div class="improvement-stat">
+                            <div class="label">Pipelined vs Sequential</div>
+                            <div class="value">${pipelineData.improvement.pipeline_vs_sequential} faster</div>
+                        </div>
+                        <div class="improvement-stat">
+                            <div class="label">Shared vs Sequential</div>
+                            <div class="value">${pipelineData.improvement.shared_vs_sequential} faster</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        function runPredictions() {
+            const params = getParams();
+            setLoading(true);
+            
+            if (params.show_pipeline) {
+                displayPipeline(true);
+            }
+            
+            // Fetch pipeline advantage data
+            fetch(`${API_URL}/api/pipeline-advantage`)
+                .then(r => r.json())
+                .then(data => {
+                    displayPipelineAdvantage(data);
+                })
+                .catch(err => console.warn('Pipeline advantage data unavailable:', err));
+            
+            fetch(`${API_URL}/api/predictions/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            })
+            .then(r => {
+                if (!r.ok) throw new Error('API Error: ' + r.status);
+                return r.json();
+            })
+            .then(data => {
+                setLoading(false);
+                const predictions = data.predictions;
+                
+                displayStats(predictions.performance);
+                displayCombinedMap(predictions.combined_state_risk);
+                displayStates(predictions.flood_predictions, 'floodStates');
+                displayStates(predictions.forestfire_predictions, 'fireStates');
+                
+                document.getElementById('status').innerHTML = '<div class="success">✓ Predictions completed successfully!</div>';
+            })
+            .catch(err => {
+                setLoading(false);
+                document.getElementById('status').innerHTML = '<div class="error">✗ Error: ' + err.message + '</div>';
+            });
+        }
+        
+        function runWithPipeline() {
+            document.getElementById('showPipeline').checked = true;
+            runPredictions();
+        }
+        
+        function runNoPipeline() {
+            document.getElementById('showPipeline').checked = false;
+            runPredictions();
+        }
+        
+        function resetAndReload() {
+            document.getElementById('workers').value = '';
+            document.getElementById('chunkSize').value = '5000';
+            document.getElementById('skipSequential').checked = true;
+            document.getElementById('showPipeline').checked = true;
+            document.getElementById('status').innerHTML = '';
+            document.getElementById('stats').innerHTML = '';
+            document.getElementById('floodStates').innerHTML = '';
+            document.getElementById('fireStates').innerHTML = '';
+            document.getElementById('combinedMap').innerHTML = '';
+        }
+        
+        // Load initial data on page load
+        window.addEventListener('load', () => {
+            runPredictions();
+        });
+    </script>
+</body>
+</html>

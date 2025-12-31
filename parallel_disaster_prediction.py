@@ -221,7 +221,42 @@ def process_forest_fire_data(df_forestfire):
     
     return state_probabilities
 
-def predict_disasters_parallel(n_workers=None, inference_chunk_size=5000, run_sequential=True):
+
+def combine_state_risks(flood_probs, fire_probs, flood_weight=0.55):
+    """Create a combined state risk map, sharing state lookups across hazards."""
+    all_states = set(flood_probs.keys()) | set(fire_probs.keys())
+    combined = []
+
+    for state in sorted(all_states):
+        flood_p = float(flood_probs.get(state, 0.0))
+        fire_p = float(fire_probs.get(state, 0.0))
+        combined_score = flood_weight * flood_p + (1.0 - flood_weight) * fire_p
+        combined.append({
+            'state': state,
+            'flood_probability': flood_p,
+            'fire_probability': fire_p,
+            'combined_risk': combined_score
+        })
+
+    return combined
+
+
+def print_pipeline_overview():
+    """Print a simple ASCII pipeline showing shared CPU work between flood and fire paths."""
+    print("\n=== PIPELINE OVERVIEW (CPU-ONLY) ===")
+    print("Shared stages help both hazards reuse work and keep cores busy:")
+    print("  [1] Load/Parse CSVs (flood.csv, forestfire.csv)")
+    print("      └─ Shared I/O; chunked reads can feed both paths")
+    print("  [2] Encode & Feature Engineering (parallel over chunks)")
+    print("      └─ Reuse encoders + state mapping for flood; fire uses fast averages")
+    print("  [3] Predict (parallel RandomForest on flood; fire is aggregated counts)")
+    print("      └─ Flood inference fanned out via process pool; fire stays light")
+    print("  [4] Aggregate per-state (shared reduction step)")
+    print("      └─ Combine flood and fire into a single state risk map")
+    print("  [5] Persist/Serve")
+    print("      └─ disaster_predictions.json drives the overall risk map")
+
+def predict_disasters_parallel(n_workers=None, inference_chunk_size=5000, run_sequential=True, show_pipeline=True):
     """Main function to predict disasters using parallel processing"""
     print("Loading datasets...")
     
@@ -229,6 +264,9 @@ def predict_disasters_parallel(n_workers=None, inference_chunk_size=5000, run_se
     df_forestfire = pd.read_csv('forestfire.csv')
 
     workers = n_workers if n_workers else max(2, cpu_count() - 1)
+
+    if show_pipeline:
+        print_pipeline_overview()
     
     print("\n=== FLOOD PREDICTION (Parallel Processing) ===")
     start_parallel = time.time()
@@ -304,9 +342,12 @@ def predict_disasters_parallel(n_workers=None, inference_chunk_size=5000, run_se
     print("\n=== FOREST FIRE PREDICTION ===")
     forestfire_probs = process_forest_fire_data(df_forestfire)
     
+    combined_map = combine_state_risks(flood_probs, forestfire_probs)
+    
     results = {
         'flood_predictions': flood_probs,
         'forestfire_predictions': forestfire_probs,
+        'combined_state_risk': combined_map,
         'performance': {
             'parallel_time': flood_time,
             'sequential_time': sequential_time,
@@ -324,12 +365,14 @@ if __name__ == '__main__':
     parser.add_argument('--workers', type=int, default=None, help='Number of worker processes for flood processing and inference')
     parser.add_argument('--chunk-size', type=int, default=5000, help='Rows per chunk for parallel inference fan-out')
     parser.add_argument('--skip-sequential', action='store_true', help='Skip the sequential baseline run')
+    parser.add_argument('--no-pipeline', action='store_true', help='Hide the pipeline overview banner')
     args = parser.parse_args()
 
     results = predict_disasters_parallel(
         n_workers=args.workers,
         inference_chunk_size=args.chunk_size,
-        run_sequential=not args.skip_sequential
+        run_sequential=not args.skip_sequential,
+        show_pipeline=not args.no_pipeline
     )
     
     with open('disaster_predictions.json', 'w') as f:
