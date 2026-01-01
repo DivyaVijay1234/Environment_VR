@@ -1,5 +1,58 @@
 var mapLoadTime = 1000;
 
+// Unity messaging guard to avoid SendMessage before engine is ready
+var unityReady = false;
+var unityQueue = [];
+
+document.addEventListener('UnityLoaded', function(){
+	unityReady = true;
+	if (unityQueue.length > 0 && typeof gameInstance !== 'undefined' && gameInstance) {
+		unityQueue.forEach(function(fn){ try { fn(); } catch (e) { console.warn('Unity send queued error', e); } });
+		unityQueue = [];
+	}
+});
+
+function sendToUnity(target, method, payload){
+	var action = function(){ gameInstance.SendMessage(target, method, payload || ""); };
+	if (unityReady && typeof gameInstance !== 'undefined' && gameInstance) {
+		action();
+	} else {
+		unityQueue.push(action);
+	}
+}
+
+// State coordinates mapping for Indian states
+var stateCoordinates = {
+    'Andhra Pradesh': {lat: 15.9129, lon: 79.7400},
+    'Arunachal Pradesh': {lat: 28.2180, lon: 94.7278},
+    'Assam': {lat: 26.2006, lon: 92.9376},
+    'Bihar': {lat: 25.0961, lon: 85.3131},
+    'Chhattisgarh': {lat: 21.2787, lon: 81.8661},
+    'Goa': {lat: 15.2993, lon: 74.1240},
+    'Gujarat': {lat: 23.0225, lon: 72.5714},
+    'Haryana': {lat: 29.0588, lon: 76.0856},
+    'Himachal Pradesh': {lat: 31.1048, lon: 77.1734},
+    'Jharkhand': {lat: 23.6102, lon: 85.2799},
+    'Karnataka': {lat: 15.3173, lon: 75.7139},
+    'Kerala': {lat: 10.8505, lon: 76.2711},
+    'Madhya Pradesh': {lat: 22.9734, lon: 78.6569},
+    'Maharashtra': {lat: 19.7515, lon: 75.7139},
+    'Manipur': {lat: 24.6637, lon: 93.9063},
+    'Meghalaya': {lat: 25.4670, lon: 91.3662},
+    'Mizoram': {lat: 23.1645, lon: 92.9376},
+    'Nagaland': {lat: 26.1584, lon: 94.5624},
+    'Odisha': {lat: 20.9517, lon: 85.0985},
+    'Punjab': {lat: 31.1471, lon: 75.3412},
+    'Rajasthan': {lat: 27.0238, lon: 74.2179},
+    'Sikkim': {lat: 27.5330, lon: 88.5122},
+    'Tamil Nadu': {lat: 11.1271, lon: 78.6569},
+    'Telangana': {lat: 18.1124, lon: 79.0193},
+    'Tripura': {lat: 23.9408, lon: 91.9882},
+    'Uttar Pradesh': {lat: 26.8467, lon: 80.9462},
+    'Uttarakhand': {lat: 30.0668, lon: 79.0193},
+    'West Bengal': {lat: 22.9868, lon: 87.8550}
+};
+
 document.getElementById("resizeButton").addEventListener("click", function(){
   var xrcontainer = document.getElementById("xrcontainer");
   xrcontainer.classList.toggle("fullscreen");
@@ -12,7 +65,7 @@ var mapParams = {"lat": 19.0596, "lon": 72.8295, "zoom": 14};
 function updateMapLocation(lat, lon, zoom=14){
 	mapParams = {"lat": lat, "lon": lon, "zoom": zoom};
 	var paramsJSON = JSON.stringify(mapParams);
-	gameInstance.SendMessage("CitySimulatorMap", "jsSetMap", paramsJSON);
+	sendToUnity("CitySimulatorMap", "jsSetMap", paramsJSON);
 }
 
 // Function to zoom out for better fullscreen view
@@ -25,14 +78,14 @@ function zoomOutView(zoomLevel=12){
 		mapParams = {"lat": 19.0596, "lon": 72.8295, "zoom": zoomLevel};
 	}
 	var paramsJSON = JSON.stringify(mapParams);
-	gameInstance.SendMessage("CitySimulatorMap", "jsSetMap", paramsJSON);
+	sendToUnity("CitySimulatorMap", "jsSetMap", paramsJSON);
 }
 
 
 function extendMap(west, east, north, south){
 	mapParams = {"west": west, "east":east, "north":north, "south":south};
 	var paramsJSON = JSON.stringify(mapParams);
-	gameInstance.SendMessage("CitySimulatorMap", "jsSetExtent", paramsJSON);
+	sendToUnity("CitySimulatorMap", "jsSetExtent", paramsJSON);
 }
 
 
@@ -55,7 +108,7 @@ var streamSensorPOIs = {"pois": [
 
 function addPOI(pois){
 	var paramsJSON = JSON.stringify(pois);
-	gameInstance.SendMessage("CitySimulatorMap", "jsSetPOIs", paramsJSON);	
+	sendToUnity("CitySimulatorMap", "jsSetPOIs", paramsJSON);	
 }
 
 // Removed: Transportation use case (Richmond, VA) - Not relevant for India-specific project
@@ -84,38 +137,38 @@ function useCaseFlood(){
 			]};
 
 	var variousSensorsPOIs = {"pois": [
-								{"lat": 19.0620,
-									"lon": 72.8320,
+								{"lat": 19.0640,
+									"lon": 72.8350,
 									"type": "RainGauge", 
-									"height": 70,
+									"height": 75,
 									"content": "IMD Rain Gauge\nLast Reading: 25 mm/hr\nMonsoon Alert: Active"},
-								{"lat": 19.0640, 
-									"lon": 72.8340,
+								{"lat": 19.0550, 
+									"lon": 72.8380,
 									"type": "Soil", 
-									"height": 70,
+									"height": 65,
 									"content": "Hydro Station\nGroundwater: Normal\nSoil Moisture: 45%\nWind: 15 km/h from SW"},
 		
 			]};
 
 	var buildingPOIs = {"pois": [
-								{"lat": 19.0560, 
-									"lon": 72.8250, 
+								{"lat": 19.0540, 
+									"lon": 72.8230, 
 									"type": "Damage", 
-									"height": 70,
+									"height": 75,
 									"content": "Damage Estimate\nCommercial Building\nStructure Damage: ₹2.5L\nContent Damage: ₹8.2L"},
-								{"lat": 19.0600,
-									"lon": 72.8290, 
+								{"lat": 19.0620,
+									"lon": 72.8360, 
 									"type": "Damage", 
-									"height": 80,
+									"height": 85,
 									"content": "Damage Estimate\nResidential Complex\nStructure Damage: 12%\nContent Damage: 28%"},
 		
 			]};
 
 	var warningPOIs = {"pois": [
-								{"lat": 19.0615,
-									"lon": 72.8315,
+								{"lat": 19.0600,
+									"lon": 72.8300,
 									"type": "Warning",
-									"height": 60,
+									"height": 100,
 									"content": "Flood Warning\nWater Level: 1.8 m\nEvacuation Recommended"},
 			]};
 
@@ -206,24 +259,133 @@ function useCaseFire(){
 }
 
 function enableTraffic(){
-	gameInstance.SendMessage("CitySimulatorMap", "jsEnableTraffic", "all");	
+	sendToUnity("CitySimulatorMap", "jsEnableTraffic", "all");	
 }
 
 function generateFlood(){
-	gameInstance.SendMessage("CitySimulatorMap", "jsGenerateFlood", "");	
+	sendToUnity("CitySimulatorMap", "jsGenerateFlood", "");	
 }
 
 function generateFire(poiJSON){
 	var paramsJSON = JSON.stringify(poiJSON);
-	gameInstance.SendMessage("CitySimulatorMap", "jsSetFire", paramsJSON);	
+	sendToUnity("CitySimulatorMap", "jsSetFire", paramsJSON);	
 }
 
 function adjustFlood(level){
 	mapParams = {"floodLevel": level};
 	var paramsJSON = JSON.stringify(mapParams);
-	gameInstance.SendMessage("CitySimulatorMap", "jsAdjustFlood", paramsJSON);
+	sendToUnity("CitySimulatorMap", "jsAdjustFlood", paramsJSON);
 }
 
 function setUserName(){
-	gameInstance.SendMessage("CameraMain", "jsSetProfile", "India User");	
+	sendToUnity("CameraMain", "jsSetProfile", "India User");	
 }
+
+// Dynamic VR initialization based on URL parameters (from prediction dashboard)
+function initializePredictionBasedVR() {
+	const urlParams = new URLSearchParams(window.location.search);
+	const state = urlParams.get('state');
+	const hazard = urlParams.get('hazard');
+	const probability = parseFloat(urlParams.get('probability'));
+	
+	if (state && hazard && probability) {
+		console.log(`Loading VR for ${state} - ${hazard} (Risk: ${(probability * 100).toFixed(1)}%)`);
+		
+		// Get state coordinates
+		const coords = stateCoordinates[state];
+		if (!coords) {
+			console.warn(`Coordinates not found for state: ${state}`);
+			return;
+		}
+		
+		// Calculate disaster extent based on probability
+		const floodLevel = probability * 5; // 0-5 meter range
+		const fireIntensity = Math.floor(probability * 10); // 0-10 scale
+		
+		// Update map to state location
+		updateMapLocation(coords.lat, coords.lon, 13);
+		
+		setTimeout(function(){
+			if (hazard === 'flood') {
+				// Generate flood scenario
+				generateFlood();
+				setTimeout(function(){
+					adjustFlood(floodLevel);
+					
+					// Add custom POI for this state
+					var customPOI = {"pois": [{
+						"lat": coords.lat,
+						"lon": coords.lon,
+						"type": "Warning",
+						"height": 80,
+						"content": `${state} Flood Alert\nRisk Level: ${(probability * 100).toFixed(1)}%\nWater Level: ${floodLevel.toFixed(1)}m\nSource: ML Prediction`
+					}]};
+					addPOI(customPOI);
+				}, 500);
+			} else if (hazard === 'fire') {
+				// Generate fire scenario with scaled intensity
+				var firePOIs = {"pois": []};
+				
+				// Create multiple fire points based on intensity
+				for (let i = 0; i < fireIntensity; i++) {
+					const offsetLat = coords.lat + (Math.random() - 0.5) * 0.02;
+					const offsetLon = coords.lon + (Math.random() - 0.5) * 0.02;
+					firePOIs.pois.push({
+						"lat": offsetLat,
+						"lon": offsetLon,
+						"type": "Fire"
+					});
+				}
+				
+				generateFire(firePOIs);
+				
+				// Add custom POI for this state
+				var customPOI = {"pois": [{
+					"lat": coords.lat,
+					"lon": coords.lon,
+					"type": "Warning",
+					"height": 80,
+					"content": `${state} Fire Alert\nRisk Level: ${(probability * 100).toFixed(1)}%\nFire Spread: ${fireIntensity}/10\nSource: ML Prediction`
+				}]};
+				addPOI(customPOI);
+			}
+			
+			enableTraffic();
+		}, mapLoadTime);
+		
+		// Update page title
+		document.title = `${state} ${hazard.charAt(0).toUpperCase() + hazard.slice(1)} - GeospatialVR`;
+	}
+}
+
+// Check if page loaded with prediction parameters
+window.addEventListener('load', function() {
+	const urlParams = new URLSearchParams(window.location.search);
+	const state = urlParams.get('state');
+	const hazard = urlParams.get('hazard');
+	const probability = parseFloat(urlParams.get('probability'));
+	
+	if (state && hazard && probability) {
+		// Show prediction info panel
+		const infoPanel = document.getElementById('prediction-info');
+		const detailsElement = document.getElementById('prediction-details');
+		if (infoPanel && detailsElement) {
+			infoPanel.style.display = 'block';
+			detailsElement.innerHTML = `
+				<strong>State:</strong> ${state}<br>
+				<strong>Hazard:</strong> ${hazard.charAt(0).toUpperCase() + hazard.slice(1)}<br>
+				<strong>Risk Probability:</strong> ${(probability * 100).toFixed(1)}%
+			`;
+		}
+		
+		// Wait for Unity to load before initializing VR
+		if (typeof gameInstance !== 'undefined' && gameInstance) {
+			initializePredictionBasedVR();
+		} else {
+			// Wait for Unity to be ready
+			document.addEventListener('UnityLoaded', function() {
+				initializePredictionBasedVR();
+			});
+		}
+	}
+});

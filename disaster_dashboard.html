@@ -183,11 +183,17 @@
             align-items: center;
             border-left: 4px solid #ddd;
             transition: all 0.2s ease;
+            cursor: pointer;
         }
         
         .state-item:hover {
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             transform: translateX(5px);
+            background: #f7fafc;
+        }
+        
+        .state-item:active {
+            transform: translateX(3px);
         }
         
         .state-name {
@@ -530,11 +536,12 @@ Shared stages help both hazards reuse work and keep cores busy:
         
         function displayStates(data, containerId) {
             const container = document.getElementById(containerId);
+            const hazardType = containerId === 'floodStates' ? 'flood' : 'fire';
             let html = '';
             
             for (const [state, prob] of Object.entries(data).sort((a, b) => b[1] - a[1])) {
                 html += `
-                    <div class="state-item">
+                    <div class="state-item" onclick="launchVR('${state}', '${hazardType}', ${prob})" title="Click to launch VR visualization">
                         <span class="state-name">${state}</span>
                         ${displayRiskBar(prob)}
                     </div>
@@ -667,7 +674,10 @@ Shared stages help both hazards reuse work and keep cores busy:
                 .then(data => {
                     displayPipelineAdvantage(data);
                 })
-                .catch(err => console.warn('Pipeline advantage data unavailable:', err));
+                .catch(err => {
+                    console.warn('Pipeline advantage data unavailable:', err);
+                    document.getElementById('pipelineAdvantage').innerHTML = '<p style="color: #999; padding: 20px;">Pipeline simulation unavailable. API server may not be running.</p>';
+                });
             
             fetch(`${API_URL}/api/predictions/run`, {
                 method: 'POST',
@@ -691,7 +701,16 @@ Shared stages help both hazards reuse work and keep cores busy:
             })
             .catch(err => {
                 setLoading(false);
-                document.getElementById('status').innerHTML = '<div class="error">✗ Error: ' + err.message + '</div>';
+                let errorMsg = err.message;
+                if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                    errorMsg = 'Cannot connect to API server. Please ensure:<br>1. API server is running: <code>python api_server.py</code><br>2. Server is on port 5000<br>3. No firewall blocking the connection';
+                }
+                document.getElementById('status').innerHTML = '<div class="error">✗ Error: ' + errorMsg + '</div>';
+                
+                // Show fallback message in data panels
+                document.getElementById('floodStates').innerHTML = '<p style="color: #999; padding: 20px;">Data unavailable. Start API server first.</p>';
+                document.getElementById('fireStates').innerHTML = '<p style="color: #999; padding: 20px;">Data unavailable. Start API server first.</p>';
+                document.getElementById('combinedMap').innerHTML = '<p style="color: #999; padding: 20px;">Data unavailable. Start API server first.</p>';
             });
         }
         
@@ -715,6 +734,16 @@ Shared stages help both hazards reuse work and keep cores busy:
             document.getElementById('floodStates').innerHTML = '';
             document.getElementById('fireStates').innerHTML = '';
             document.getElementById('combinedMap').innerHTML = '';
+        }
+        
+        function launchVR(state, hazardType, probability) {
+            // Store selection and redirect to main VR page
+            const params = new URLSearchParams({
+                state: state,
+                hazard: hazardType,
+                probability: probability
+            });
+            window.location.href = `/?${params.toString()}`;
         }
         
         // Load initial data on page load

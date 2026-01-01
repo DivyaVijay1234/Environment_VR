@@ -112,12 +112,16 @@
                 
                 // Display performance metrics
                 if (data.performance) {
+                    const p = data.performance;
+                    const hasSeq = typeof p.sequential_time === 'number' && !isNaN(p.sequential_time);
+                    const hasSpeedup = typeof p.speedup === 'number' && !isNaN(p.speedup);
+
                     document.getElementById('performanceBox').style.display = 'block';
-                    document.getElementById('parallelTime').textContent = data.performance.parallel_time.toFixed(2);
-                    document.getElementById('sequentialTime').textContent = data.performance.sequential_time.toFixed(2);
-                    document.getElementById('speedup').textContent = data.performance.speedup.toFixed(2) + 'x';
-                    document.getElementById('accuracy').textContent = (data.performance.accuracy * 100).toFixed(2) + '%';
-                    document.getElementById('cpuCores').textContent = data.performance.cpu_cores_used;
+                    document.getElementById('parallelTime').textContent = typeof p.parallel_time === 'number' ? p.parallel_time.toFixed(2) : '-';
+                    document.getElementById('sequentialTime').textContent = hasSeq ? p.sequential_time.toFixed(2) : 'skipped';
+                    document.getElementById('speedup').textContent = hasSpeedup ? p.speedup.toFixed(2) + 'x' : 'n/a';
+                    document.getElementById('accuracy').textContent = typeof p.accuracy === 'number' ? (p.accuracy * 100).toFixed(2) + '%' : '-';
+                    document.getElementById('cpuCores').textContent = p.cpu_cores_used || '-';
                 }
 
                 // Create flood heatmap
@@ -128,7 +132,7 @@
 
             } catch (error) {
                 console.error('Error loading predictions:', error);
-                alert('Error loading predictions. Make sure the API server is running on port 5000.');
+                alert('Error loading predictions. Ensure the API server is running on port 5000 (python api_server.py).');
             }
         }
 
