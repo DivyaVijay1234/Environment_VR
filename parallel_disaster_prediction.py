@@ -1,8 +1,3 @@
-"""
-Parallel Processing for Disaster Prediction (Floods & Forest Fires)
-Uses multiprocessing to analyze datasets and predict state-wise disaster probabilities
-"""
-
 import argparse
 import pickle
 import time
@@ -18,7 +13,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import json
 
-# Indian state mapping (approximate coordinates to states)
 STATE_COORDINATES = {
     'Andhra Pradesh': (15.9129, 79.7400),
     'Arunachal Pradesh': (28.2180, 94.7278),
@@ -69,6 +63,7 @@ _FEATURE_COLS = None
 
 
 def _init_model_worker(model_bytes, feature_cols):
+    # Worker-side model deserialize to avoid reloading per task
     global _MODEL, _FEATURE_COLS
     _MODEL = pickle.loads(model_bytes)
     _FEATURE_COLS = feature_cols
@@ -82,7 +77,6 @@ def _predict_chunk_with_state(chunk):
     })
 
 def get_state_from_coordinates(lat, lon):
-    """Map coordinates to Indian state (simplified - uses distance to state centers)"""
     min_dist = float('inf')
     closest_state = 'Unknown'
     for state, (state_lat, state_lon) in STATE_COORDINATES.items():
@@ -93,11 +87,8 @@ def get_state_from_coordinates(lat, lon):
     return closest_state
 
 def process_flood_chunk(chunk_data):
-    """Process a chunk of flood data - runs in parallel with intensive computation"""
     chunk, label_encoders = chunk_data
     chunk = chunk.copy()
-    
-    # Encode categorical variables
     for col in ['Land Cover', 'Soil Type']:
         if col in chunk.columns:
             le = label_encoders.get(col)
@@ -107,11 +98,7 @@ def process_flood_chunk(chunk_data):
                 label_encoders[col] = le
             else:
                 chunk[col] = le.transform(chunk[col].astype(str))
-    
-    # Add state mapping - vectorized for better performance
     chunk['State'] = chunk.apply(lambda row: get_state_from_coordinates(row['Latitude'], row['Longitude']), axis=1)
-    
-    # Add intensive feature engineering (benefits from parallel processing)
     chunk['Risk_Index'] = (
         chunk['Rainfall (mm)'] * 0.3 + 
         chunk['Water Level (m)'] * 0.25 + 
@@ -119,8 +106,6 @@ def process_flood_chunk(chunk_data):
         chunk['Historical Floods'] * 0.15 + 
         chunk['Population Density'] * 0.1
     )
-    
-    # Additional computation that benefits from parallelization
     chunk['Elevation_Risk'] = np.where(chunk['Elevation (m)'] < 500, 1.2, 
                                        np.where(chunk['Elevation (m)'] < 1000, 1.0, 0.8))
     chunk['Composite_Risk'] = chunk['Risk_Index'] * chunk['Elevation_Risk']
@@ -128,25 +113,16 @@ def process_flood_chunk(chunk_data):
     return chunk
 
 def process_flood_data_parallel(df, n_workers=None):
-    """Process flood data using parallel processing"""
+    # Chunk the dataset and fan out processing across a process pool
     if n_workers is None:
-        n_workers = max(2, cpu_count() - 1)  # Use all but one core to avoid overload
-    
-    # Split data into chunks - ensure at least 2 chunks for parallelization
-    chunk_size = max(100, len(df) // n_workers)  # Minimum 100 rows per chunk
+        n_workers = max(2, cpu_count() - 1)
+    chunk_size = max(100, len(df) // n_workers)
     chunks = [df.iloc[i:i+chunk_size].copy() for i in range(0, len(df), chunk_size)]
-    
-    # Create label encoders for each chunk (they'll be fitted independently)
     chunk_data = [(chunk, {}) for chunk in chunks]
-    
-    # Process in parallel - this is where the speedup happens
+    # Pool applies the heavy feature work per chunk in parallel
     with Pool(n_workers) as pool:
         processed_chunks = pool.map(process_flood_chunk, chunk_data)
-    
-    # Combine results
     result_df = pd.concat(processed_chunks, ignore_index=True)
-    
-    # Re-encode categoricals consistently across all chunks
     le_lc = LabelEncoder()
     le_st = LabelEncoder()
     result_df['Land Cover'] = le_lc.fit_transform(result_df['Land Cover'].astype(str))
@@ -170,6 +146,7 @@ def predict_flood_probabilities_parallel(model, processed_df, feature_cols, n_wo
     model_bytes = pickle.dumps(model)
 
     probability_frames = []
+    # Executor spreads inference batches to worker processes with a shared model
     with ProcessPoolExecutor(max_workers=n_workers, initializer=_init_model_worker, initargs=(model_bytes, feature_cols)) as executor:
         futures = [executor.submit(_predict_chunk_with_state, chunk) for chunk in chunks]
         for future in as_completed(futures):
@@ -180,10 +157,10 @@ def predict_flood_probabilities_parallel(model, processed_df, feature_cols, n_wo
 
 
 def train_flood_model_parallel(df, n_workers=None, inference_chunk_size=5000):
-    """Train flood prediction model with parallel data processing and inference"""
     start_time = time.time()
 
     workers = n_workers if n_workers else max(2, cpu_count() - 1)
+    # Parallel feature pipeline for flood data
     processed_df = process_flood_data_parallel(df, n_workers=workers)
 
     X = processed_df[FLOOD_FEATURE_COLS]
@@ -206,16 +183,11 @@ def train_flood_model_parallel(df, n_workers=None, inference_chunk_size=5000):
     return model, state_probabilities, processing_time, accuracy_score(y_test, model.predict(X_test)), workers
 
 def process_forest_fire_data(df_forestfire):
-    """Process forest fire data and calculate state-wise probabilities"""
-    # Calculate average fire incidents per state
     state_fire_counts = {}
     for _, row in df_forestfire.iterrows():
         state = row['States/UTs']
-        # Average across years
         avg_fires = (row['2010-2011'] + row['2009-10'] + row['2008-09']) / 3
         state_fire_counts[state] = avg_fires
-    
-    # Normalize to probabilities (0-1 scale)
     max_fires = max(state_fire_counts.values()) if state_fire_counts else 1
     state_probabilities = {state: min(count / max_fires, 1.0) for state, count in state_fire_counts.items()}
     
@@ -223,7 +195,6 @@ def process_forest_fire_data(df_forestfire):
 
 
 def combine_state_risks(flood_probs, fire_probs, flood_weight=0.55):
-    """Create a combined state risk map, sharing state lookups across hazards."""
     all_states = set(flood_probs.keys()) | set(fire_probs.keys())
     combined = []
 
@@ -242,7 +213,6 @@ def combine_state_risks(flood_probs, fire_probs, flood_weight=0.55):
 
 
 def print_pipeline_overview():
-    """Print a simple ASCII pipeline showing shared CPU work between flood and fire paths."""
     print("\n=== PIPELINE OVERVIEW (CPU-ONLY) ===")
     print("Shared stages help both hazards reuse work and keep cores busy:")
     print("  [1] Load/Parse CSVs (flood.csv, forestfire.csv)")
@@ -257,7 +227,6 @@ def print_pipeline_overview():
     print("      └─ disaster_predictions.json drives the overall risk map")
 
 def predict_disasters_parallel(n_workers=None, inference_chunk_size=5000, run_sequential=True, show_pipeline=True):
-    """Main function to predict disasters using parallel processing"""
     print("Loading datasets...")
     
     df_flood = pd.read_csv('flood.csv')
